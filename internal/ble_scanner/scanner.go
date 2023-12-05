@@ -21,9 +21,10 @@ import (
 const ZEUS_MAC_PREFIX = "5a:45:55:53"
 
 type Scanner struct {
-	db     *db.DB
-	ctx    context.Context
-	socket *socket.Send
+	db         *db.DB
+	ctx        context.Context
+	socket     *socket.Send
+	recvSocket *socket.Recv
 }
 
 type BatonData struct {
@@ -40,16 +41,25 @@ func New(db *db.DB) *Scanner {
 
 	ble.SetDefaultDevice(d)
 	ctx := context.Background()
+
+	// Gotta have a listener before we can dial into it
+	recvSocket, err := socket.NewRecv()
+
+	if err != nil {
+		log.Fatalf("Error creating unix socket: %v\n", err)
+	}
+
 	sendSocket, err := socket.NewSend()
 
 	if err != nil {
-		log.Fatalf("")
+		log.Fatalf("Error dialing unix socket: %v\n", err)
 	}
 
 	scanner := Scanner{
-		db:     db,
-		ctx:    ctx,
-		socket: sendSocket,
+		db:         db,
+		ctx:        ctx,
+		socket:     sendSocket,
+		recvSocket: recvSocket,
 	}
 	return &scanner
 }
@@ -110,4 +120,5 @@ func chkErr(err error) {
 
 func (S *Scanner) Close() {
 	S.socket.Close()
+	S.recvSocket.Close()
 }
