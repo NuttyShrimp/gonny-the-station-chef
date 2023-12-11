@@ -31,7 +31,8 @@
                 initdb --encoding=UTF8 --no-locale --no-instructions -U postgres
                 echo "listen_addresses = ${"'"}${"'"}" >> $PGDATA/postgresql.conf
                 echo "unix_socket_directories = '$PGDATA'" >> $PGDATA/postgresql.conf
-                echo "CREATE USER ronny WITH PASSWORD 'ronnydbpassword' CREATEDB SUPERUSER;" | postgres --single -E ronny
+                echo "CREATE USER ronny WITH PASSWORD 'ronnydbpassword' CREATEDB SUPERUSER;" | postgres --single -E postgres
+                echo "CREATE DATABASE ronny WITH owner 'ronny';" | postgres --single -E postgres
               '';
             }
             {
