@@ -93,8 +93,13 @@ func (S *Scanner) handleAdvertisment(a ble.Advertisement) {
 		BatteryPercentage: batonData.BatteryPercentage,
 	}
 
-	go S.socket.NotifyChange(&detection)
-	go S.db.InsertDetection(&detection)
+	go func() {
+		id, err := S.db.InsertDetection(&detection)
+		if err != nil {
+			log.Fatalf("Failed to insert detection: %v", err)
+		}
+		S.socket.NotifyChange(id)
+	}()
 }
 
 func (S *Scanner) Scan() {

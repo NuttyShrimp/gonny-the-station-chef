@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"encoding/binary"
 	"net"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
@@ -26,7 +27,9 @@ func (S *Send) Close() {
 	S.conn.Close()
 }
 
-func (S *Send) NotifyChange(*db.Detection) error {
-	_, err := S.conn.Write([]byte("ping"))
+func (S *Send) NotifyChange(id uint64) error {
+	idArr := make([]byte, 8)
+	binary.BigEndian.PutUint64(idArr, id)
+	_, err := S.conn.Write(idArr)
 	return err
 }

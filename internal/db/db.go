@@ -42,7 +42,12 @@ func (db *DB) Close() {
 	db.conn.Close()
 }
 
-func (db *DB) InsertDetection(detection *Detection) {
+func (db *DB) InsertDetection(detection *Detection) (uint64, error) {
 	fmt.Println("Inserting detection")
-	// db.conn.Exec("INSERT INTO ")
+	id := uint64(0)
+	err := db.conn.QueryRow("INSERT INTO detections (detection_time, mac, rssi, baton_uptime_ms, battery_percentage) VALUES ($1, $2, $3, $4, $5) RETURNING id", detection.DetectionTime, detection.Mac, detection.Rssi, detection.UptimeMs, detection.BatteryPercentage).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
