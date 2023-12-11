@@ -51,3 +51,24 @@ func (db *DB) InsertDetection(detection *Detection) (uint64, error) {
 	}
 	return id, nil
 }
+
+func (db *DB) GetDetectionsBetweenIds(a, b uint64) (*[]Detection, error) {
+	detections := []Detection{}
+	rows, err := db.conn.Query("SELECT id, detection_time, mac, rssi, baton_uptime_ms, battery_percentage WHERE id BETWEEN $1 AND $2", a, b)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	detection := Detection{}
+	for rows.Next() {
+		err := rows.Scan(&detection.Id, &detection.DetectionTime, &detection.Mac, &detection.Rssi, &detection.UptimeMs, &detection.BatteryPercentage)
+		if err != nil {
+			return nil, err
+		}
+
+		detections = append(detections, detection)
+	}
+	return &detections, nil
+}

@@ -3,8 +3,6 @@ package socket
 import (
 	"encoding/binary"
 	"net"
-
-	"github.com/12urenloop/gonny-the-station-chef/internal/db"
 )
 
 type Send struct {

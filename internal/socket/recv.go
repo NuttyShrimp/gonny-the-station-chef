@@ -8,8 +8,8 @@ import (
 )
 
 type Recv struct {
-	conn       net.Listener
-	NotifyChan chan uint64
+	conn      net.Listener
+	LastValue uint64
 }
 
 func NewRecv() (*Recv, error) {
@@ -19,8 +19,7 @@ func NewRecv() (*Recv, error) {
 	}
 
 	recv := Recv{
-		conn:       c,
-		NotifyChan: make(chan uint64),
+		conn: c,
 	}
 	return &recv, nil
 }
@@ -41,7 +40,6 @@ func (R *Recv) Listen() {
 		fd.Read(payload)
 
 		id := binary.BigEndian.Uint64(payload)
-
-		R.NotifyChan <- id
+		R.LastValue = id
 	}
 }
