@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
 	"github.com/12urenloop/gonny-the-station-chef/internal/socket"
@@ -25,6 +26,7 @@ func main() {
 		log.Fatalf("Failed to open socket listener: %v", err)
 	}
 
+	// TODO: should listen and when returned, start listening again until a value is send to a channel
 	go recvSocket.Listen()
 
 	app := fiber.New()
@@ -46,21 +48,30 @@ func main() {
 			return
 		}
 
-		// TODO: Resend all messages after the lastId from the initMsg
-
-		// The lastId we passed
-		lastId := uint64(initMsg.LastId)
+		lastId := initMsg.LastId
+		if lastId > recvSocket.LastValue {
+			lastId = recvSocket.LastValue
+		}
 
 		for {
+			oldId := lastId
 			newId := recvSocket.LastValue
-			if newId == lastId {
+			if newId == oldId {
 				continue
 			}
 
-			detections, err := db.GetDetectionsBetweenIds(lastId, newId)
+			log.Printf("Sending detections between %d and %d\n", oldId+1, newId)
+			detections, err := db.GetDetectionsBetweenIds(oldId+1, newId)
+			log.Printf("Fetched detections between %d and %d\n", oldId+1, newId)
 
 			if err != nil {
 				log.Fatalf("Failed fetching detections: %+v\n", err)
+			}
+
+			err = c.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err != nil {
+				log.Fatalf("Failed set write deadline on WS: %+v\n", err)
+				continue
 			}
 
 			if err = c.WriteJSON(detections); err != nil {
@@ -81,7 +92,7 @@ func main() {
 	c := make(chan os.Signal, 1)                    // Create channel to signify a signal being sent
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM) // When an interrupt or termination signal is sent, notify the channel
 
-	_ = <-c // This blocks the main thread until an interrupt is received
+	<-c // This blocks the main thread until an interrupt is received
 	fmt.Println("Gracefully shutting down...")
 	_ = app.Shutdown()
 

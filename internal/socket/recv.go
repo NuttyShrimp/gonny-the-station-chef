@@ -61,7 +61,7 @@ func (R *Recv) Listen() {
 		}
 
 		id := binary.BigEndian.Uint64(payload[0:nr])
-		R.LastValue = id
 		log.Printf("Received payload: %d\n", id)
+		R.LastValue = id
 	}
 }
