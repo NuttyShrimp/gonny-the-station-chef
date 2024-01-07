@@ -1,14 +1,15 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/utils"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/joho/godotenv/autoload"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var (
@@ -17,58 +18,42 @@ var (
 	user     = utils.GetEnvOrFallback("DATABASE_USER", "ronny")
 	password = utils.GetEnvOrFallback("DATABASE_PASSWORD", "ronnydbpassword")
 	dbname   = utils.GetEnvOrFallback("DATABASE_DB", "ronny")
-	psqlconn = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+	psqldsn  = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 )
 
 type DB struct {
-	conn *sql.DB
+	conn *gorm.DB
 }
 
 func New() *DB {
-	conn, err := sql.Open("pgx", psqlconn)
+	conn, err := gorm.Open(postgres.Open(psqldsn), &gorm.Config{})
 
 	if err != nil {
-		log.Fatalf("Cannot create db connection: %v\n", err)
+		// TODO: properly handle this
+		os.Exit(1)
 	}
 
 	db := DB{
 		conn: conn,
 	}
 
+	err = conn.AutoMigrate(&Detection{})
+	if err != nil {
+		log.Fatalf("Failed to do auto migration for tables: %+v\n", err)
+	}
+
 	return &db
 }
 
-func (db *DB) Close() {
-	db.conn.Close()
-}
-
-func (db *DB) InsertDetection(detection *Detection) (uint64, error) {
-	fmt.Println("Inserting detection")
-	id := uint64(0)
-	err := db.conn.QueryRow("INSERT INTO detections (detection_time, mac, rssi, baton_uptime_ms, battery_percentage) VALUES ($1, $2, $3, $4, $5) RETURNING id", detection.DetectionTime, detection.Mac, detection.Rssi, detection.UptimeMs, detection.BatteryPercentage).Scan(&id)
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
+func (db *DB) InsertDetection(detection *Detection) (int64, error) {
+	err := db.conn.Create(detection).Error
+	return detection.ID, err
 }
 
 func (db *DB) GetDetectionsBetweenIds(a, b uint64) (*[]Detection, error) {
 	detections := []Detection{}
-	rows, err := db.conn.Query("SELECT id, detection_time, mac, rssi, baton_uptime_ms, battery_percentage WHERE id BETWEEN $1 AND $2", a, b)
 
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	err := db.conn.Where("id BETWEEN ? AND ?", a, b).Find(&detections).Error
 
-	detection := Detection{}
-	for rows.Next() {
-		err := rows.Scan(&detection.Id, &detection.DetectionTime, &detection.Mac, &detection.Rssi, &detection.UptimeMs, &detection.BatteryPercentage)
-		if err != nil {
-			return nil, err
-		}
-
-		detections = append(detections, detection)
-	}
-	return &detections, nil
+	return &detections, err
 }

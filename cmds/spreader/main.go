@@ -85,7 +85,6 @@ func main() {
 	fmt.Println("Gracefully shutting down...")
 	_ = app.Shutdown()
 
-	db.Close()
 	recvSocket.Close()
 
 	fmt.Println("Fiber was successful shutdown.")

@@ -8,7 +8,6 @@ import (
 func main() {
 	// Open DB conn
 	db := db.New()
-	defer db.Close()
 
 	scanner := blescanner.New(db)
 	defer scanner.Close()

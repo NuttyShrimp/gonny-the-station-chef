@@ -1,9 +1,11 @@
 package db
 
-import "time"
+import (
+	"time"
+)
 
 type Detection struct {
-	Id                uint64    `json:"id"`
+	ID                int64     `json:"id" gorm:"primaryKey,autoIncrement"`
 	DetectionTime     time.Time `json:"detectionTime"`
 	Mac               string    `json:"mac"`
 	Rssi              int       `json:"rssi"`
