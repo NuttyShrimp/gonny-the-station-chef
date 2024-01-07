@@ -2,18 +2,21 @@ package socket
 
 import (
 	"encoding/binary"
+	"errors"
+	"io"
+	"log"
 	"net"
-
-	"github.com/gofiber/fiber/v2/log"
+	"os"
+	"time"
 )
 
 type Recv struct {
-	conn      net.Listener
+	conn      net.Conn
 	LastValue uint64
 }
 
 func NewRecv() (*Recv, error) {
-	c, err := net.Listen("unix", "/tmp/gonny.sock")
+	c, err := net.Dial("unix", "/tmp/gonny.sock")
 	if err != nil {
 		return nil, err
 	}
@@ -30,16 +33,35 @@ func (R *Recv) Close() {
 
 func (R *Recv) Listen() {
 	for {
-		fd, err := R.conn.Accept()
+		time.Sleep(1 * time.Second)
+
+		err := R.conn.SetDeadline(time.Now().Add(10 * time.Second))
 		if err != nil {
-			log.Fatalf("Failed to accept unix conn socket: %v", fd)
-			return
+			log.Println("Failed to set deadline on unix socket: %+v\n", err)
+			continue
 		}
 
-		payload := []byte{}
-		fd.Read(payload)
+		payload := make([]byte, 8)
+		nr, err := R.conn.Read(payload)
+		if err != nil {
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				log.Println("Failed to read data from unix socket: deadline exceeded")
+				continue
+			}
+			if errors.Is(err, io.EOF) {
+				// Handle connection closure
+				log.Println("Connection closed")
+				break
+			}
+			log.Printf("Failed to read data from unix socket: %+v\n", err)
+		}
 
-		id := binary.BigEndian.Uint64(payload)
+		if nr < 1 {
+			continue
+		}
+
+		id := binary.BigEndian.Uint64(payload[0:nr])
 		R.LastValue = id
+		log.Printf("Received payload: %d\n", id)
 	}
 }
