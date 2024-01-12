@@ -11,8 +11,9 @@ import (
 )
 
 type Recv struct {
-	conn      net.Conn
-	LastValue uint64
+	conn       net.Conn
+	LastValue  uint64
+	BufferSize uint
 }
 
 func NewRecv() (*Recv, error) {
@@ -22,7 +23,8 @@ func NewRecv() (*Recv, error) {
 	}
 
 	recv := Recv{
-		conn: c,
+		conn:       c,
+		BufferSize: 4096,
 	}
 	return &recv, nil
 }
@@ -37,11 +39,12 @@ func (R *Recv) Listen() {
 
 		err := R.conn.SetDeadline(time.Now().Add(10 * time.Second))
 		if err != nil {
-			log.Println("Failed to set deadline on unix socket: %+v\n", err)
+			log.Printf("Failed to set deadline on unix socket: %+v\n", err)
 			continue
 		}
 
-		payload := make([]byte, 8)
+		payload := make([]byte, R.BufferSize)
+		log.Printf("Listening on unix socket\n")
 		nr, err := R.conn.Read(payload)
 		if err != nil {
 			if errors.Is(err, os.ErrDeadlineExceeded) {
@@ -60,7 +63,12 @@ func (R *Recv) Listen() {
 			continue
 		}
 
-		id := binary.BigEndian.Uint64(payload[0:nr])
+		start := nr - 8
+		if start < 0 {
+			start = 0
+		}
+
+		id := binary.BigEndian.Uint64(payload[start:nr])
 		log.Printf("Received payload: %d\n", id)
 		R.LastValue = id
 	}

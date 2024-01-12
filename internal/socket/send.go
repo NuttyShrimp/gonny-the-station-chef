@@ -33,7 +33,11 @@ func NewSend() (*Send, error) {
 }
 
 func (S *Send) removeChannel(chanIdx int) {
-	S.channels = append(S.channels[:chanIdx], S.channels[chanIdx+1:]...)
+	newChannels := S.channels[:chanIdx]
+	if (chanIdx + 1) < len(S.channels) {
+		newChannels = append(newChannels, S.channels[chanIdx+1:]...)
+	}
+	S.channels = newChannels
 }
 
 func (S *Send) Close() {

@@ -6,17 +6,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
 	"github.com/12urenloop/gonny-the-station-chef/internal/socket"
+	"github.com/12urenloop/gonny-the-station-chef/internal/wshandlers"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
-
-type InitMessage struct {
-	LastId uint64 `json:"lastId"`
-}
 
 func main() {
 	db := db.New()
@@ -31,6 +27,30 @@ func main() {
 
 	app := fiber.New()
 
+	app.Get("/buffer_size", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"size": recvSocket.BufferSize,
+		})
+	})
+
+	app.Post("/buffer_size/:size", func(c *fiber.Ctx) error {
+		param := struct {
+			Size uint `params:"size"`
+		}{}
+		err := c.ParamsParser(&param)
+
+		if err != nil {
+			log.Printf("Failed to parse params: %+v\n", err)
+			return c.SendStatus(400)
+		}
+
+		recvSocket.BufferSize = param.Size
+
+		return c.JSON(fiber.Map{
+			"size": recvSocket.BufferSize,
+		})
+	})
+
 	app.Use("/detections", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			c.Locals("allowed", true)
@@ -40,47 +60,19 @@ func main() {
 	})
 
 	app.Get("/detections", websocket.New(func(c *websocket.Conn) {
-		initMsg := InitMessage{}
+		initMsg := struct {
+			LastId uint64 `json:"lastId"`
+		}{}
 
 		if err := c.ReadJSON(&initMsg); err != nil {
-			log.Fatalf("Failed to read initial WS msg: %+v\n", err)
+			log.Printf("Failed to read initial WS msg: %+v\n", err)
 			c.Close()
 			return
 		}
 
-		lastId := initMsg.LastId
-		if lastId > recvSocket.LastValue {
-			lastId = recvSocket.LastValue
-		}
-
-		for {
-			oldId := lastId
-			newId := recvSocket.LastValue
-			if newId == oldId {
-				continue
-			}
-
-			log.Printf("Sending detections between %d and %d\n", oldId+1, newId)
-			detections, err := db.GetDetectionsBetweenIds(oldId+1, newId)
-			log.Printf("Fetched detections between %d and %d\n", oldId+1, newId)
-
-			if err != nil {
-				log.Fatalf("Failed fetching detections: %+v\n", err)
-			}
-
-			err = c.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err != nil {
-				log.Fatalf("Failed set write deadline on WS: %+v\n", err)
-				continue
-			}
-
-			if err = c.WriteJSON(detections); err != nil {
-				// Do some error recovery/restart procedure
-				log.Fatalf("Failed to send detections over websocket: %+v\n", err)
-				continue
-			}
-			lastId = newId
-		}
+		c.Locals("db", db)
+		go wshandlers.Writer(c, recvSocket, initMsg.LastId)
+		wshandlers.Receiver(c)
 	}))
 
 	go func() {
