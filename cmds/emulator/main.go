@@ -42,7 +42,7 @@ mainLoop:
 				go sendSocket.NotifyChange(id)
 				log.Printf("Inserted detection with id: %d\n", id)
 
-				time.Sleep(1 * time.Second)
+				time.Sleep(time.Duration(randInt(10, 500)) * time.Millisecond)
 			}
 		}
 	}
