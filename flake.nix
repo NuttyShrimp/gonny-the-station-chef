@@ -21,7 +21,7 @@
       in
       with pkgs; {
         devShells.default = pkgs.devshell.mkShell {
-          packages = [ go postgresql_15 ];
+          packages = [ go postgresql ];
           commands = [
             {
               name = "pg:setup";
