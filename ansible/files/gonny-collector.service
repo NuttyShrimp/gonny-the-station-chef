@@ -1,0 +1,15 @@
+[Unit]
+Description=Gonny Collector, collects detections into a database
+Requires=network.target
+Requires=time-sync.target
+After=network.target
+After=time-sync.target
+
+[Service]
+Type=simple
+Restart=always
+User=root
+ExecStart=/gonny/cmds/collector/main
+
+[Install]
+WantedBy=multi-user.target
