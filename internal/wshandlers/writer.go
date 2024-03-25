@@ -9,18 +9,24 @@ import (
 	"time"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
-	"github.com/12urenloop/gonny-the-station-chef/internal/socket"
 	"github.com/gofiber/contrib/websocket"
 )
 
-func Writer(c *websocket.Conn, recvSocket *socket.Recv, lastId uint64) {
-	if lastId > recvSocket.LastValue {
-		lastId = recvSocket.LastValue
-	}
-
+func Writer(c *websocket.Conn, lastId int64) {
 	closeChan := make(chan bool)
 
 	db := c.Locals("db").(*db.DB)
+
+	lastDbId, err := db.GetLastDetectionId()
+	if err != nil {
+		log.Printf("Failed to get last detection id: %+v\n", err)
+		closeChan <- true
+	}
+
+	// TODO: SQL query
+	if lastId > lastDbId {
+		lastId = lastDbId
+	}
 
 out:
 	for {
@@ -32,17 +38,23 @@ out:
 				if c.Conn == nil {
 					closeChan <- true
 				}
-				oldId := lastId
-				newId := recvSocket.LastValue
-				if newId == oldId {
+
+				lastDbId, err := db.GetLastDetectionId()
+				if err != nil {
+					log.Printf("Failed to get last detection id: %+v\n", err)
+					closeChan <- true
+				}
+
+				if lastDbId == lastId {
 					continue
 				}
 
-				log.Printf("Sending detections between %d and %d\n", oldId+1, newId)
-				detections, err := db.GetDetectionsBetweenIds(oldId+1, newId)
+				log.Printf("Sending detections between %d and %d\n", lastId+1, lastDbId)
+				detections, err := db.GetDetectionsBetweenIds(lastId+1, lastDbId)
 
 				if err != nil {
 					log.Printf("Failed fetching detections: %+v\n", err)
+					continue
 				}
 
 				err = c.SetWriteDeadline(time.Now().Add(10 * time.Second))
@@ -66,7 +78,7 @@ out:
 					log.Printf("Failed to send detections over websocket: %+v\n", err)
 					continue
 				}
-				lastId = newId
+				lastId = lastDbId
 
 				// Do not spam the loop
 				time.Sleep(10 * time.Millisecond)

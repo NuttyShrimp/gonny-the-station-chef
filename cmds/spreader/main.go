@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
-	"github.com/12urenloop/gonny-the-station-chef/internal/socket"
 	"github.com/12urenloop/gonny-the-station-chef/internal/wshandlers"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
@@ -17,39 +16,7 @@ import (
 func main() {
 	db := db.New()
 
-	recvSocket, err := socket.NewRecv()
-	if err != nil {
-		log.Fatalf("Failed to open socket listener: %v", err)
-	}
-
-	// TODO: should listen and when returned, start listening again until a value is send to a channel
-	go recvSocket.Listen()
-
 	app := fiber.New()
-
-	app.Get("/buffer_size", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"size": recvSocket.BufferSize,
-		})
-	})
-
-	app.Post("/buffer_size/:size", func(c *fiber.Ctx) error {
-		param := struct {
-			Size uint `params:"size"`
-		}{}
-		err := c.ParamsParser(&param)
-
-		if err != nil {
-			log.Printf("Failed to parse params: %+v\n", err)
-			return c.SendStatus(400)
-		}
-
-		recvSocket.BufferSize = param.Size
-
-		return c.JSON(fiber.Map{
-			"size": recvSocket.BufferSize,
-		})
-	})
 
 	app.Use("/detections", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
@@ -61,7 +28,7 @@ func main() {
 
 	app.Get("/detections", websocket.New(func(c *websocket.Conn) {
 		initMsg := struct {
-			LastId uint64 `json:"lastId"`
+			LastId int64 `json:"lastId"`
 		}{}
 
 		if err := c.ReadJSON(&initMsg); err != nil {
@@ -71,7 +38,7 @@ func main() {
 		}
 
 		c.Locals("db", db)
-		go wshandlers.Writer(c, recvSocket, initMsg.LastId)
+		go wshandlers.Writer(c, initMsg.LastId)
 		wshandlers.Receiver(c)
 	}))
 
@@ -87,8 +54,6 @@ func main() {
 	<-c // This blocks the main thread until an interrupt is received
 	fmt.Println("Gracefully shutting down...")
 	_ = app.Shutdown()
-
-	recvSocket.Close()
 
 	fmt.Println("Fiber was successful shutdown.")
 }

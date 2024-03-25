@@ -10,17 +10,11 @@ import (
 	"time"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
-	"github.com/12urenloop/gonny-the-station-chef/internal/socket"
 )
 
 func main() {
 	// Open DB conn
 	db := db.New()
-
-	sendSocket, err := socket.NewSend()
-	if err != nil {
-		log.Fatalf("Error dialing unix socket: %v\n", err)
-	}
 
 	c := make(chan os.Signal, 1)                    // Create channel to signify a signal being sent
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM) // When an interrupt or termination signal is sent, notify the channel
@@ -39,15 +33,12 @@ mainLoop:
 				if err != nil {
 					log.Fatalf("Failed to insert detection: %v", err)
 				}
-				go sendSocket.NotifyChange(id)
 				log.Printf("Inserted detection with id: %d\n", id)
 
 				time.Sleep(time.Duration(randInt(10, 500)) * time.Millisecond)
 			}
 		}
 	}
-
-	sendSocket.Close()
 }
 
 func generateRandomDetection() *db.Detection {

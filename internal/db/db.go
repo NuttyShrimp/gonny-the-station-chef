@@ -50,10 +50,16 @@ func (db *DB) InsertDetection(detection *Detection) (int64, error) {
 	return detection.ID, err
 }
 
-func (db *DB) GetDetectionsBetweenIds(a, b uint64) (*[]Detection, error) {
+func (db *DB) GetDetectionsBetweenIds(a, b int64) (*[]Detection, error) {
 	detections := []Detection{}
 
 	err := db.conn.Where("id BETWEEN ? AND ?", a, b).Find(&detections).Error
 
 	return &detections, err
+}
+
+func (db *DB) GetLastDetectionId() (int64, error) {
+	var detection Detection
+	err := db.conn.Last(&detection).Error
+	return detection.ID, err
 }

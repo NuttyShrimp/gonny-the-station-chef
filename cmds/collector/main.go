@@ -10,7 +10,6 @@ func main() {
 	db := db.New()
 
 	scanner := blescanner.New(db)
-	defer scanner.Close()
 
 	scanner.Scan()
 }
