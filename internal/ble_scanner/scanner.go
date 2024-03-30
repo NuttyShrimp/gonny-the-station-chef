@@ -15,6 +15,7 @@ import (
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const ZEUS_MAC_PREFIX = "5a:45:55:53"
@@ -63,7 +64,7 @@ func (S *Scanner) handleAdvertisment(a ble.Advertisement) {
 
 	batonData := BatonData{}
 	if err := binary.Read(bytes.NewReader(advData), binary.BigEndian, &batonData); err != nil {
-		log.Printf("Failed to parse manufacturer data: %v\n", err)
+		logrus.Errorf("Failed to parse manufacturer data: %v\n", err)
 		return
 	}
 

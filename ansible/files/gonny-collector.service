@@ -10,6 +10,7 @@ Type=simple
 Restart=always
 User=root
 ExecStart=/gonny/cmds/collector/main
+Environment="LOG_LEVEL=warning"
 
 [Install]
 WantedBy=multi-user.target

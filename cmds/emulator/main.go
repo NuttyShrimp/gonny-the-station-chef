@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -10,9 +9,13 @@ import (
 	"time"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
+	"github.com/12urenloop/gonny-the-station-chef/internal/logger"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
+	logger.InitLogger()
+
 	// Open DB conn
 	db := db.New()
 
@@ -31,9 +34,9 @@ mainLoop:
 
 				id, err := db.InsertDetection(detection)
 				if err != nil {
-					log.Fatalf("Failed to insert detection: %v", err)
+					logrus.Fatalf("Failed to insert detection: %v", err)
 				}
-				log.Printf("Inserted detection with id: %d\n", id)
+				logrus.Infof("Inserted detection with id: %d\n", id)
 
 				time.Sleep(time.Duration(randInt(10, 500)) * time.Millisecond)
 			}
