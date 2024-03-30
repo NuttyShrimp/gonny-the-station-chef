@@ -12,3 +12,8 @@ type Detection struct {
 	UptimeMs          uint64    `json:"uptimeMs"`
 	BatteryPercentage uint8     `json:"batteryPercentage"`
 }
+
+func (D *Detection) TableName() string {
+	// Python does not use plural table names
+	return "detection"
+}

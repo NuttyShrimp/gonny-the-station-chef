@@ -3,8 +3,9 @@ package db
 import (
 	"fmt"
 	"log"
-	"os"
 	"strconv"
+
+	"database/sql"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/utils"
 	_ "github.com/joho/godotenv/autoload"
@@ -22,18 +23,25 @@ var (
 )
 
 type DB struct {
+	raw  *sql.DB
 	conn *gorm.DB
 }
 
 func New() *DB {
-	conn, err := gorm.Open(postgres.Open(psqldsn), &gorm.Config{})
+	sqlDb, err := sql.Open("pgx", psqldsn)
+	if err != nil {
+		log.Fatalf("Failed to open a DB connection: %+v\n", err)
+	}
+	conn, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlDb,
+	}), &gorm.Config{})
 
 	if err != nil {
-		// TODO: properly handle this
-		os.Exit(1)
+		log.Fatalf("Failed to open a DB connection: %+v\n", err)
 	}
 
 	db := DB{
+		raw:  sqlDb,
 		conn: conn,
 	}
 
@@ -46,7 +54,10 @@ func New() *DB {
 }
 
 func (db *DB) InsertDetection(detection *Detection) (int64, error) {
-	err := db.conn.Create(detection).Error
+	// err := db.conn.Create(detection).Error
+	id := int64(0)
+	err := db.raw.QueryRow("INSERT INTO detections (rssi, mac, uptime_ms, detection_time, battery_percentage) VALUES ($1, $2, $3, $4, $5) RETURNING id", detection.Rssi, detection.Mac, detection.UptimeMs, detection.DetectionTime, detection.BatteryPercentage).Scan(&id)
+	detection.ID = id
 	return detection.ID, err
 }
 
