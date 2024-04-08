@@ -69,8 +69,28 @@ func (db *DB) GetDetectionsBetweenIds(a, b int64) (*[]Detection, error) {
 	return &detections, err
 }
 
+func (db *DB) GetLimitedIdsAfter(a, limit int) (*[]Detection, error) {
+	detections := []Detection{}
+
+	err := db.conn.Where("id >", a).Limit(limit).Find(&detections).Error
+
+	return &detections, err
+}
+
 func (db *DB) GetLastDetectionId() (int64, error) {
 	var detection Detection
 	err := db.conn.Last(&detection).Error
 	return detection.ID, err
+}
+
+func (db *DB) GetLastDetection() (*Detection, error) {
+	detection := Detection{}
+
+	err := db.conn.Order("id desc").Limit(1).First(&detection).Error
+
+	if err != nil && err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+
+	return &detection, err
 }

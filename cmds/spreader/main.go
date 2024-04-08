@@ -5,7 +5,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/12urenloop/gonny-the-station-chef/internal/db"
 	"github.com/12urenloop/gonny-the-station-chef/internal/logger"
@@ -18,11 +20,70 @@ import (
 func main() {
 	logger.InitLogger()
 
-	db := db.New()
+	conn := db.New()
 
 	app := fiber.New()
 
-	app.Use("/detections", func(c *fiber.Ctx) error {
+	stationId, err := os.Hostname()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Backward compatibility with ronny
+	app.Get("/detections/:last_id", func(c *fiber.Ctx) error {
+		lastIdStr := c.Params("last_id")
+		if lastIdStr == "" {
+			return c.SendString("last_id is required")
+		}
+		lastId, err := strconv.Atoi(lastIdStr)
+		if err != nil {
+			logrus.Errorf("Failed to convert last_id to int: %+v\n", err)
+			return c.SendString("last_id must be an integer")
+		}
+
+		limit := c.QueryInt("limit", 1000)
+
+		detections, err := conn.GetLimitedIdsAfter(lastId, limit)
+		if err != nil {
+			logrus.Errorf("Failed to retrieve detections from DB: %+v\n", err)
+			return c.SendString("Failed to retrieve detections from DB")
+		}
+
+		return c.JSON(struct {
+			Detections *[]db.Detection `json:"detections"`
+			StationId  string          `json:"station_id"`
+		}{
+			detections,
+			stationId,
+		})
+	})
+
+	app.Get("/time", func(c *fiber.Ctx) error {
+		return c.JSON(struct {
+			Timestamp int64 `json:"timestamp"`
+		}{
+			Timestamp: time.Now().UnixMilli(),
+		})
+	})
+
+	app.Get("/last_detection", func(c *fiber.Ctx) error {
+		detection, err := conn.GetLastDetection()
+		if err != nil {
+			logrus.Errorf("Failed to retrieve last detection from DB: %+v\n", err)
+			return c.SendString("Failed to retrieve last detection from DB")
+		}
+
+		return c.JSON(struct {
+			Detection *db.Detection `json:"detection"`
+			StationId string        `json:"station_id"`
+		}{
+			detection,
+			stationId,
+		})
+	})
+
+	app.Use("/", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			c.Locals("allowed", true)
 			return c.Next()
@@ -30,7 +91,7 @@ func main() {
 		return fiber.ErrUpgradeRequired
 	})
 
-	app.Get("/detections", websocket.New(func(c *websocket.Conn) {
+	app.Get("/", websocket.New(func(c *websocket.Conn) {
 		initMsg := struct {
 			LastId int64 `json:"lastId"`
 		}{}
@@ -41,7 +102,7 @@ func main() {
 			return
 		}
 
-		c.Locals("db", db)
+		c.Locals("db", conn)
 		go wshandlers.Writer(c, initMsg.LastId)
 		wshandlers.Receiver(c)
 	}))
